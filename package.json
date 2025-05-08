@@ -1,0 +1,18 @@
+{
+  "name": "holiday-slack-bot",
+  "version": "1.0.0",
+  "description": "A Slack bot that checks for upcoming holidays and sends notifications",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^3.13.0",
+    "axios": "^1.4.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
