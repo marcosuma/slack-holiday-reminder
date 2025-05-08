@@ -1,0 +1,97 @@
+{
+  "display_information": {
+    "name": "Holiday Bot",
+    "description": "A bot that notifies about upcoming holidays",
+    "background_color": "#2C2D30"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Holiday Bot",
+      "always_online": true
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "chat:write.public",
+        "commands"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "YOUR_APP_URL/slack/events",
+      "bot_events": [
+        "app_mention"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "YOUR_APP_URL/slack/events"
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false
+  },
+  "functions": [
+    {
+      "title": "Check for upcoming holidays",
+      "description": "Checks for upcoming holidays and sends notifications",
+      "input_parameters": [
+        {
+          "name": "days_ahead",
+          "title": "Days ahead",
+          "description": "Number of days ahead to check for holidays",
+          "type": "integer",
+          "default": 7,
+          "is_required": false
+        },
+        {
+          "name": "country_code",
+          "title": "Country code",
+          "description": "ISO country code (e.g., US, GB, CA)",
+          "type": "string",
+          "default": "US",
+          "is_required": false
+        }
+      ],
+      "output_parameters": [
+        {
+          "name": "holidays_found",
+          "title": "Holidays found",
+          "description": "Number of holidays found in the period",
+          "type": "integer"
+        }
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "name": "Daily holiday check",
+      "type": "scheduled",
+      "callback_id": "daily_holiday_check",
+      "schedule": {
+        "start_time": "09:00",
+        "timezone": "America/New_York",
+        "frequency": {
+          "type": "daily"
+        }
+      },
+      "inputs": {
+        "days_ahead": 7,
+        "country_code": "US"
+      },
+      "steps": [
+        {
+          "function_id": "Check for upcoming holidays",
+          "inputs": {
+            "days_ahead": "{{inputs.days_ahead}}",
+            "country_code": "{{inputs.country_code}}"
+          },
+          "name": "check_holidays"
+        }
+      ]
+    }
+  ]
+}
