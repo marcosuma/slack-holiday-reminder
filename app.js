@@ -1,5 +1,12 @@
 const { App } = require('@slack/bolt');
-const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
+const fetch = require('node-fetch');
+
+
+const FILENAME = 'holidays.json';
+const COUNTRIES_OF_INTEREST = ['Ireland', 'Italy', 'Spain', 'USA'];
+const DAYS_AHEAD = 30;
 
 // Initialize the Slack app
 const app = new App({
@@ -9,39 +16,74 @@ const app = new App({
   appToken: process.env.SLACK_APP_TOKEN
 });
 
+function checkHolidays(data, countriesOfInterest, today, daysAhead) {
+  const results = [];
+  const todayWeekday = today.getDay(); // 0 (Sunday) to 6 (Saturday)
+  const daysUntilNextWeek = 6 - todayWeekday;
+
+  countriesOfInterest.forEach(country => {
+    data[country].holidays.forEach(holiday => {
+      const holidayDate = new Date(holiday.date);
+      const holidayWeekday = holidayDate.getDay();
+
+      // Skip weekends
+      if (holidayWeekday === 0 || holidayWeekday === 6) {
+        return;
+      }
+
+      const daysDelta = Math.floor((holidayDate - today) / (1000 * 60 * 60 * 24));
+      if (daysDelta >= daysUntilNextWeek && daysDelta <= daysUntilNextWeek + daysAhead) {
+        // if holiday.region is null, just use country
+        country_text = country
+        if (holiday.region) {
+          country_text = country + " / " + holiday.region;
+        }
+        results.push({ "name": holiday.name, "country": country_text, "date": holiday.date });
+      }
+    });
+  });
+
+  return results;
+}
+
 // Function to get upcoming holidays
-async function getUpcomingHolidays(countryCode, daysAhead) {
+async function getUpcomingHolidays(daysAhead, countryList) {
   const today = new Date();
   const year = today.getFullYear();
-  
+
   try {
-    // Using Nager.Date API (free, no API key required)
-    const response = await axios.get(`https://date.nager.at/api/v3/PublicHolidays/${year}/${countryCode}`);
-    
-    const endDate = new Date();
-    endDate.setDate(today.getDate() + daysAhead);
-    
-    // Filter holidays within our date range
-    const upcomingHolidays = response.data.filter(holiday => {
-      const holidayDate = new Date(holiday.date);
-      return holidayDate >= today && holidayDate <= endDate;
-    }).map(holiday => {
+    const filePath = path.resolve(FILENAME);
+    let data;
+
+    if (fs.existsSync(filePath)) {
+      console.log('file already exists');
+      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } else {
+      const response = await fetch(process.env.HOLIDAY_API_URL);
+      data = await response.json();
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    }
+
+    const results = checkHolidays(data, countryList, today, daysAhead);
+
+    const upcomingHolidays = results.map(holiday => {
       const holidayDate = new Date(holiday.date);
       const daysUntil = Math.ceil((holidayDate - today) / (1000 * 60 * 60 * 24));
-      
+
       return {
         name: holiday.name,
+        country: holiday.country,
         date: holiday.date,
         daysUntil: daysUntil,
-        formattedDate: holidayDate.toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+        formattedDate: holidayDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         })
       };
-    });
-    
+    })
+
     return upcomingHolidays;
   } catch (error) {
     console.error(`Error fetching holidays: ${error}`);
@@ -64,7 +106,7 @@ function formatHolidayMessage(holidays, daysAhead) {
       ]
     };
   }
-  
+
   const blocks = [
     {
       type: "header",
@@ -78,41 +120,42 @@ function formatHolidayMessage(holidays, daysAhead) {
       type: "divider"
     }
   ];
-  
+
   holidays.forEach(holiday => {
     blocks.push({
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*${holiday.name}*\n${holiday.formattedDate} (${holiday.daysUntil} days from now)`
+        text: `In *${holiday.country}*: *${holiday.name}*\n${holiday.formattedDate} (${holiday.daysUntil} days from now)`
       }
     });
   });
-  
+
   return { blocks };
 }
 
 // Register the function for the workflow
 app.function('Check for upcoming holidays', async ({ inputs, client }) => {
-  // Extract inputs from the function call
-  const daysAhead = inputs.days_ahead || 7;
-  const countryCode = inputs.country_code || 'US';
-  
+  // // Extract inputs from the function call
+  const daysAhead = inputs.days_ahead || DAYS_AHEAD;
+  // create a list of countries from the comma separated inputs.country_list
+  const countryList = inputs.country_list ? inputs.country_list.split(',').map(country => country.trim()) : COUNTRIES_OF_INTEREST;
+
   // Get upcoming holidays
-  const holidays = await getUpcomingHolidays(countryCode, daysAhead);
-  
+  const holidays = await getUpcomingHolidays(daysAhead, countryList);
+
   // Post the message to the channel where the workflow is configured
   if (holidays.length > 0) {
     try {
       // Get the channel ID where the workflow was triggered
       const channelId = process.env.HOLIDAY_BOT_CHANNEL || '#general';
-      
+
       // Post the message
       await client.chat.postMessage({
         channel: channelId,
         ...formatHolidayMessage(holidays, daysAhead)
       });
-      
+
       console.log(`Posted holiday information to channel: ${channelId}`);
     } catch (error) {
       console.error(`Error posting message: ${error}`);
@@ -120,7 +163,7 @@ app.function('Check for upcoming holidays', async ({ inputs, client }) => {
   } else {
     console.log(`No holidays found in the next ${daysAhead} days`);
   }
-  
+
   // Return the output
   return {
     outputs: {
@@ -132,12 +175,25 @@ app.function('Check for upcoming holidays', async ({ inputs, client }) => {
 // Handle app mentions to respond with holidays
 app.event('app_mention', async ({ event, client }) => {
   try {
-    const holidays = await getUpcomingHolidays('US', 7);
-    
+    // from event.text extract the days_ahead and country_list
+    const daysAheadMatch = event.text.match(/days_ahead=(\d+)/);
+    // country_list from the input has a value between " and " and is comma separated
+    // e.g. country_list="Ireland, Italy, Spain"
+    // so we need to extract the value between the quotes
+    // and split it by comma
+    // and trim the spaces
+    // e.g. country_list="Ireland, Italy, Spain" => ["Ireland", "Italy", "Spain"]
+    // write the regex based on the comment above
+    const countryListMatch = event.text.match(/country_list="([^"]+)"/);
+    const daysAhead = daysAheadMatch ? parseInt(daysAheadMatch[1]) : DAYS_AHEAD;
+    const countryList = countryListMatch ? countryListMatch[1].split(',').map(country => country.trim()) : COUNTRIES_OF_INTEREST;
+    // Get upcoming holidays
+    const holidays = await getUpcomingHolidays(daysAhead, countryList);
+
     await client.chat.postMessage({
       channel: event.channel,
-      ...formatHolidayMessage(holidays, 7),
-      text: `Here are the upcoming holidays in the next 7 days:`
+      ...formatHolidayMessage(holidays, daysAhead),
+      text: `Here are the upcoming holidays in the next ${daysAhead} days:`
     });
   } catch (error) {
     console.error(error);
@@ -149,3 +205,4 @@ app.event('app_mention', async ({ event, client }) => {
   await app.start(process.env.PORT || 3000);
   console.log('⚡️ Holiday Bot app is running!');
 })();
+

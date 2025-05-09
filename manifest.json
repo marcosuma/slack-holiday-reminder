@@ -21,14 +21,14 @@
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "YOUR_APP_URL/slack/events",
+      "request_url": "https://slack-holiday-reminder-4a2fm3zis-marcos-projects-5746297d.vercel.app/slack/events",
       "bot_events": [
         "app_mention"
       ]
     },
     "interactivity": {
       "is_enabled": true,
-      "request_url": "YOUR_APP_URL/slack/events"
+      "request_url": "https://slack-holiday-reminder-4a2fm3zis-marcos-projects-5746297d.vercel.app/slack/events"
     },
     "org_deploy_enabled": false,
     "socket_mode_enabled": true,
@@ -44,15 +44,15 @@
           "title": "Days ahead",
           "description": "Number of days ahead to check for holidays",
           "type": "integer",
-          "default": 7,
+          "default": 0,
           "is_required": false
         },
         {
-          "name": "country_code",
+          "name": "country_list",
           "title": "Country code",
           "description": "ISO country code (e.g., US, GB, CA)",
           "type": "string",
-          "default": "US",
+          "default": "Italy, Spain, Ireland, USA, Canada",
           "is_required": false
         }
       ],
@@ -79,15 +79,15 @@
         }
       },
       "inputs": {
-        "days_ahead": 7,
-        "country_code": "US"
+        "days_ahead": 0,
+        "country_list": "Italy, Spain, Ireland, USA, Canada"
       },
       "steps": [
         {
           "function_id": "Check for upcoming holidays",
           "inputs": {
             "days_ahead": "{{inputs.days_ahead}}",
-            "country_code": "{{inputs.country_code}}"
+            "country_list": "{{inputs.country_code}}"
           },
           "name": "check_holidays"
         }
