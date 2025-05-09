@@ -15,83 +15,93 @@
       "bot": [
         "chat:write",
         "chat:write.public",
-        "commands"
+        "commands",
+        "app_mentions:read"
       ]
     }
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "https://slack-holiday-reminder-4a2fm3zis-marcos-projects-5746297d.vercel.app/slack/events",
+      "request_url": "https://slack-holiday-reminder-4a2fm3zis-marcos-projects-5746297d.vercel.app:3000/slack/events",
       "bot_events": [
         "app_mention"
       ]
     },
     "interactivity": {
       "is_enabled": true,
-      "request_url": "https://slack-holiday-reminder-4a2fm3zis-marcos-projects-5746297d.vercel.app/slack/events"
+      "request_url": "https://slack-holiday-reminder-4a2fm3zis-marcos-projects-5746297d.vercel.app:3000/slack/events"
     },
-    "org_deploy_enabled": false,
+    "org_deploy_enabled": true,
     "socket_mode_enabled": true,
-    "token_rotation_enabled": false
+    "token_rotation_enabled": false,
+    "function_runtime" : "slack"
   },
-  "functions": [
-    {
+  "functions": {
+    "check_upcoming_holidays": {
       "title": "Check for upcoming holidays",
       "description": "Checks for upcoming holidays and sends notifications",
-      "input_parameters": [
-        {
-          "name": "days_ahead",
+      "input_parameters": {
+        "days_ahead": {
           "title": "Days ahead",
           "description": "Number of days ahead to check for holidays",
           "type": "integer",
           "default": 0,
           "is_required": false
         },
-        {
-          "name": "country_list",
+        "country_list": {
           "title": "Country code",
           "description": "ISO country code (e.g., US, GB, CA)",
           "type": "string",
           "default": "Italy, Spain, Ireland, USA, Canada",
           "is_required": false
         }
-      ],
-      "output_parameters": [
-        {
-          "name": "holidays_found",
+      },
+      "output_parameters": {
+        "holidays_found": {
           "title": "Holidays found",
           "description": "Number of holidays found in the period",
           "type": "integer"
         }
-      ]
+      }
     }
-  ],
-  "workflows": [
-    {
-      "name": "Daily holiday check",
-      "type": "scheduled",
-      "callback_id": "daily_holiday_check",
-      "schedule": {
-        "start_time": "09:00",
-        "timezone": "America/New_York",
-        "frequency": {
-          "type": "daily"
+  },
+  "workflows": {
+    "daily_holiday_check": {
+      "title": "Daily holiday check",
+      "description": "A scheduled workflow to check for holidays daily",
+      "suggested_triggers": [
+        {
+          "type": "scheduled",
+          "inputs": {
+            "days_ahead": {
+              "value": 7
+            },
+            "country_list": {
+              "value": "Italy, Spain, Ireland, USA, Canada"
+            }
+          }
         }
-      },
-      "inputs": {
-        "days_ahead": 0,
-        "country_list": "Italy, Spain, Ireland, USA, Canada"
+      ],
+      "input_parameters": {
+        "days_ahead": {
+          "type": "integer",
+          "default": 0
+        },
+        "country_list": {
+          "type": "string",
+          "default": "Italy, Spain, Ireland, USA, Canada"
+        }
       },
       "steps": [
         {
-          "function_id": "Check for upcoming holidays",
+          "id": "check_holidays_step",
+          "function_id": "check_upcoming_holidays",
           "inputs": {
             "days_ahead": "{{inputs.days_ahead}}",
-            "country_list": "{{inputs.country_code}}"
-          },
-          "name": "check_holidays"
+            "country_list": "{{inputs.country_list}}"
+          }
         }
       ]
     }
-  ]
+  }
 }
