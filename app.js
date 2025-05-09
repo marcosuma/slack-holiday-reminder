@@ -200,6 +200,16 @@ app.event('app_mention', async ({ event, client }) => {
   }
 });
 
+// Handle Slack's URL verification
+app.post('/slack/events', (req, res) => {
+  if (req.body.type === 'url_verification') {
+    return res.status(200).send({ challenge: req.body.challenge });
+  }
+
+  // Handle other event types here
+  res.status(200).send();
+});
+
 // Start the app
 (async () => {
   await app.start(process.env.PORT || 3000);

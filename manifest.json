@@ -22,22 +22,22 @@
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "https://slack-holiday-reminder-4a2fm3zis-marcos-projects-5746297d.vercel.app:3000/slack/events",
+      "request_url": "https://slack-holiday-reminder.vercel.app:3000/slack/events",
       "bot_events": [
         "app_mention"
       ]
     },
     "interactivity": {
       "is_enabled": true,
-      "request_url": "https://slack-holiday-reminder-4a2fm3zis-marcos-projects-5746297d.vercel.app:3000/slack/events"
+      "request_url": "https://slack-holiday-reminder.vercel.app:3000/slack/events"
     },
     "org_deploy_enabled": true,
     "socket_mode_enabled": true,
     "token_rotation_enabled": false,
-    "function_runtime" : "slack"
+    "function_runtime": "slack"
   },
   "functions": {
-    "check_upcoming_holidays": {
+    "check_holidays": {
       "title": "Check for upcoming holidays",
       "description": "Checks for upcoming holidays and sends notifications",
       "input_parameters": {
@@ -95,7 +95,7 @@
       "steps": [
         {
           "id": "check_holidays_step",
-          "function_id": "check_upcoming_holidays",
+          "function_id": "check_holidays",
           "inputs": {
             "days_ahead": "{{inputs.days_ahead}}",
             "country_list": "{{inputs.country_list}}"
