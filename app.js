@@ -1,12 +1,17 @@
 const { App } = require('@slack/bolt');
+const { createEventAdapter } = require('@slack/events-api');
+const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
 const fetch = require('node-fetch');
-
+const express = require('express');
 
 const FILENAME = 'holidays.json';
 const COUNTRIES_OF_INTEREST = ['Ireland', 'Italy', 'Spain', 'USA'];
 const DAYS_AHEAD = 30;
+
+// Initialize the Slack Event Adapter
+const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET);
 
 // Initialize the Slack app
 const app = new App({
@@ -173,7 +178,7 @@ app.function('Check for upcoming holidays', async ({ inputs, client }) => {
 });
 
 // Handle app mentions to respond with holidays
-app.event('app_mention', async ({ event, client }) => {
+slackEvents.on('app_mention', async (event) => {
   try {
     // from event.text extract the days_ahead and country_list
     const daysAheadMatch = event.text.match(/days_ahead=(\d+)/);
@@ -186,11 +191,13 @@ app.event('app_mention', async ({ event, client }) => {
     // write the regex based on the comment above
     const countryListMatch = event.text.match(/country_list="([^"]+)"/);
     const daysAhead = daysAheadMatch ? parseInt(daysAheadMatch[1]) : DAYS_AHEAD;
-    const countryList = countryListMatch ? countryListMatch[1].split(',').map(country => country.trim()) : COUNTRIES_OF_INTEREST;
-    // Get upcoming holidays
+    const countryList = countryListMatch
+      ? countryListMatch[1].split(',').map((country) => country.trim())
+      : COUNTRIES_OF_INTEREST;
+
     const holidays = await getUpcomingHolidays(daysAhead, countryList);
 
-    await client.chat.postMessage({
+    await app.client.chat.postMessage({
       channel: event.channel,
       ...formatHolidayMessage(holidays, daysAhead),
       text: `Here are the upcoming holidays in the next ${daysAhead} days:`
@@ -200,19 +207,19 @@ app.event('app_mention', async ({ event, client }) => {
   }
 });
 
-// Handle Slack's URL verification
-app.post('/slack/events', (req, res) => {
-  if (req.body.type === 'url_verification') {
-    return res.status(200).send({ challenge: req.body.challenge });
-  }
-
-  // Handle other event types here
-  res.status(200).send();
+// Middleware to handle Slack's URL verification
+slackEvents.on('url_verification', (event, respond) => {
+  respond({ challenge: event.challenge });
 });
 
-// Start the app
-(async () => {
-  await app.start(process.env.PORT || 3000);
-  console.log('⚡️ Holiday Bot app is running!');
-})();
+// Attach the Slack Event Adapter to your Express app
+const server = express();
+server.use('/slack/events', slackEvents.expressMiddleware());
+server.use(bodyParser.json());
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`⚡️ Holiday Bot is running on port ${PORT}`);
+});
 
